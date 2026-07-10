@@ -6,6 +6,7 @@ import ConstellationSky from "./components/ConstellationSky";
 import VisionForm from "./components/VisionForm";
 import VisionViewer from "./components/VisionViewer";
 import AdjacentContours from "./components/AdjacentContours";
+import WorkspacePortal from "./components/WorkspacePortal";
 import {
   Volume2,
   VolumeX,
@@ -18,7 +19,8 @@ import {
   Clock,
   ExternalLink,
   ChevronRight,
-  Heart
+  Heart,
+  HardDrive
 } from "lucide-react";
 
 // Definitions of gorgeous ambient themes matching times of day
@@ -87,7 +89,7 @@ export default function App() {
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const [volume, setVolume] = useState(0.5);
 
-  const [viewMode, setViewMode] = useState<"field" | "constellations">("field");
+  const [viewMode, setViewMode] = useState<"field" | "constellations" | "workspace">("field");
 
   // Semantic wind, moon, and visit frequency states
   const [moonPhase, setMoonPhase] = useState<number>(0.5);
@@ -387,12 +389,23 @@ export default function App() {
               <Sparkles className="w-3.5 h-3.5" />
               <span>Созвездия Памяти & Свитки</span>
             </button>
+            <button
+              onClick={() => setViewMode("workspace")}
+              className={`flex items-center gap-2 py-2 px-4 sm:px-5 rounded-xl text-xs font-mono tracking-wider transition-all duration-300 cursor-pointer ${
+                viewMode === "workspace"
+                  ? "bg-white/10 text-emerald-300 font-medium shadow-md"
+                  : "text-white/40 hover:text-white/75"
+              }`}
+            >
+              <HardDrive className="w-3.5 h-3.5" />
+              <span>Эфирные Сферы Google</span>
+            </button>
           </div>
         </div>
 
         {/* Loading Indicator / Canvas Field */}
         <div className="relative" id="field-viewport">
-          {isLoading && (
+          {isLoading && viewMode !== "workspace" && (
             <div className="absolute inset-0 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center rounded-3xl z-40 animate-fade-in gap-4 border border-white/5">
               <span className="w-8 h-8 border-3 border-white/25 border-t-white rounded-full animate-spin" />
               <p className="text-xs font-mono tracking-widest text-white/70 uppercase">
@@ -417,12 +430,23 @@ export default function App() {
                 />
               );
             })()
-          ) : (
+          ) : viewMode === "constellations" ? (
             <ConstellationSky
               visions={visions}
               activeTheme={activeTheme}
               onVisionClick={handleVisionClick}
               isAudioEnabled={isAudioEnabled}
+            />
+          ) : (
+            <WorkspacePortal
+              activeTheme={activeTheme}
+              visions={visions}
+              isAudioEnabled={isAudioEnabled}
+              onTriggerRipple={() => {
+                if (isAudioEnabled) {
+                  ambientAudio.playChime(0.5, 0.5);
+                }
+              }}
             />
           )}
         </div>
