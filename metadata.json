@@ -1,0 +1,6 @@
+{
+  "name": "Поле (The Rejoicing Field)",
+  "description": "Интерактивное созерцательное поле, где ваши видения встречаются друг с другом и перестают быть одинокими.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
