@@ -14,6 +14,12 @@ export class AmbientAudio {
   private droneGain: GainNode | null = null;
   private droneFilter: BiquadFilterNode | null = null;
 
+  // Root system & Semantic wind audio additions
+  private subBassOsc: OscillatorNode | null = null;
+  private subBassGain: GainNode | null = null;
+  private subBassLfo: OscillatorNode | null = null;
+  private tuningMultiplier = 1.0;
+
   // G Major Pentatonic scale (Harmonizes perfectly)
   private scale = [196.00, 220.00, 246.94, 293.66, 329.63, 392.00, 440.00, 493.88, 587.33, 659.25, 783.99, 880.00, 987.77, 1174.66, 1318.51, 1567.98];
 
@@ -278,6 +284,52 @@ export class AmbientAudio {
       mod.stop(now + attack + decay + 0.1);
       vibrato.stop(now + attack + decay + 0.1);
     });
+  }
+
+  public setTuningMultiplier(multiplier: number) {
+    this.tuningMultiplier = multiplier;
+    if (!this.isInitialized || !this.ctx || !this.droneOsc1 || !this.droneOsc2) return;
+    const freqs = this.themeFrequencies[this.currentThemeId] || this.themeFrequencies.dusk;
+    const now = this.ctx.currentTime;
+    this.droneOsc1.frequency.exponentialRampToValueAtTime(freqs.root * multiplier, now + 1.5);
+    this.droneOsc2.frequency.exponentialRampToValueAtTime(freqs.fifth * multiplier, now + 1.5);
+  }
+
+  public setSubBassActive(active: boolean, volumeFactor: number = 0.5) {
+    if (!this.isInitialized) this.init();
+    if (!this.ctx || !this.masterGain) return;
+
+    if (active) {
+      if (!this.subBassOsc) {
+        this.subBassGain = this.ctx.createGain();
+        this.subBassGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        this.subBassGain.connect(this.masterGain);
+
+        this.subBassOsc = this.ctx.createOscillator();
+        this.subBassOsc.type = "sine";
+        this.subBassOsc.frequency.setValueAtTime(36.0, this.ctx.currentTime);
+        this.subBassOsc.connect(this.subBassGain);
+        this.subBassOsc.start();
+
+        this.subBassLfo = this.ctx.createOscillator();
+        const lfoGain = this.ctx.createGain();
+        this.subBassLfo.frequency.setValueAtTime(0.08, this.ctx.currentTime);
+        lfoGain.gain.setValueAtTime(1.5, this.ctx.currentTime);
+        this.subBassLfo.connect(lfoGain);
+        lfoGain.connect(this.subBassOsc.frequency);
+        this.subBassLfo.start();
+      }
+
+      const targetGain = 0.18 * volumeFactor;
+      this.subBassGain?.gain.linearRampToValueAtTime(targetGain, this.ctx.currentTime + 1.5);
+    } else {
+      this.subBassGain?.gain.linearRampToValueAtTime(0.0, this.ctx.currentTime + 1.0);
+    }
+  }
+
+  public setSubBassFrequency(freq: number) {
+    if (!this.isInitialized || !this.ctx || !this.subBassOsc) return;
+    this.subBassOsc.frequency.linearRampToValueAtTime(freq, this.ctx.currentTime + 0.5);
   }
 
   public resume() {

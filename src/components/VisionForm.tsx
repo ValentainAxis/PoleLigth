@@ -7,7 +7,7 @@ interface VisionFormProps {
   y: number;
   activeTheme: Theme;
   onClose: () => void;
-  onSubmit: (text: string, color: string) => Promise<void>;
+  onSubmit: (text: string, color: string, modelId: string) => Promise<void>;
 }
 
 const COLOR_SEEDS = [
@@ -27,6 +27,7 @@ export default function VisionForm({
 }: VisionFormProps) {
   const [text, setText] = useState("");
   const [selectedColor, setSelectedColor] = useState(COLOR_SEEDS[0].value);
+  const [selectedModel, setSelectedModel] = useState("gemini-3.5-flash");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,7 +36,7 @@ export default function VisionForm({
 
     setIsSubmitting(true);
     try {
-      await onSubmit(text, selectedColor);
+      await onSubmit(text, selectedColor, selectedModel);
     } catch (err) {
       console.error(err);
     } finally {
@@ -142,6 +143,27 @@ export default function VisionForm({
                 );
               })}
             </div>
+          </div>
+
+          {/* Model Selector */}
+          <div>
+            <label className="block text-xs font-mono tracking-widest uppercase mb-2 opacity-50">
+              Голос ИИ (Разум ветра)
+            </label>
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="w-full rounded-2xl p-3 bg-black/20 border border-white/5 focus:border-white/10 focus:outline-none text-xs font-mono text-emerald-400 cursor-pointer"
+              style={{
+                borderColor: selectedColor + "20"
+              }}
+            >
+              <option value="gemini-3.5-flash" className="bg-[#0f172a] text-white">Gemini 3.5 Flash (Шёпот поля)</option>
+              <option value="gemini-2.5-flash" className="bg-[#0f172a] text-white">Gemini 2.5 Flash (Легкий ветерок)</option>
+              <option value="gemini-2.5-pro" className="bg-[#0f172a] text-white">Gemini 2.5 Pro (Глубокое созерцание)</option>
+              <option value="gemini-1.5-pro" className="bg-[#0f172a] text-white">Gemini 1.5 Pro (Древний архитектор)</option>
+              <option value="gemini-1.5-flash" className="bg-[#0f172a] text-white">Gemini 1.5 Flash (Быстрая вспышка)</option>
+            </select>
           </div>
 
           {/* Prompt/Instruction */}

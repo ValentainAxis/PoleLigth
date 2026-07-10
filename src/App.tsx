@@ -5,6 +5,7 @@ import CanvasField from "./components/CanvasField";
 import ConstellationSky from "./components/ConstellationSky";
 import VisionForm from "./components/VisionForm";
 import VisionViewer from "./components/VisionViewer";
+import AdjacentContours from "./components/AdjacentContours";
 import {
   Volume2,
   VolumeX,
@@ -88,6 +89,11 @@ export default function App() {
 
   const [viewMode, setViewMode] = useState<"field" | "constellations">("field");
 
+  // Semantic wind, moon, and visit frequency states
+  const [moonPhase, setMoonPhase] = useState<number>(0.5);
+  const [season, setSeason] = useState<"winter" | "spring" | "summer" | "autumn">("autumn");
+  const [visitFreq, setVisitFreq] = useState<"rare" | "balanced" | "deep">("balanced");
+
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -109,6 +115,14 @@ export default function App() {
       if (!response.ok) throw new Error("Failed to fetch visions from field");
       const data = await response.json();
       setVisions(data);
+      
+      // Keep selected vision in sync if currently viewed
+      if (selectedVision) {
+        const updated = data.find((v: Vision) => v.id === selectedVision.id);
+        if (updated) {
+          setSelectedVision(updated);
+        }
+      }
       setErrorMsg("");
     } catch (err: any) {
       console.error(err);
@@ -167,7 +181,7 @@ export default function App() {
     setIsFormOpen(true);
   };
 
-  const handlePlantSubmit = async (text: string, color: string) => {
+  const handlePlantSubmit = async (text: string, color: string, modelId: string) => {
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/visions", {
@@ -178,6 +192,7 @@ export default function App() {
           x: plantCoords.x,
           y: plantCoords.y,
           color,
+          modelId,
         }),
       });
 
@@ -387,13 +402,21 @@ export default function App() {
           )}
 
           {viewMode === "field" ? (
-            <CanvasField
-              visions={visions}
-              activeTheme={activeTheme}
-              onVisionClick={handleVisionClick}
-              onPlantClick={handlePlantClick}
-              isAudioEnabled={isAudioEnabled}
-            />
+            (() => {
+              const derivedWindIntensity = season === "winter" ? 0.95 : season === "autumn" ? 0.7 : season === "spring" ? 0.45 : 0.25;
+              const derivedFireflySpeed = visitFreq === "rare" ? 1.8 : visitFreq === "deep" ? 0.35 : 1.0;
+              return (
+                <CanvasField
+                  visions={visions}
+                  activeTheme={activeTheme}
+                  onVisionClick={handleVisionClick}
+                  onPlantClick={handlePlantClick}
+                  isAudioEnabled={isAudioEnabled}
+                  windIntensity={derivedWindIntensity}
+                  fireflySpeed={derivedFireflySpeed}
+                />
+              );
+            })()
           ) : (
             <ConstellationSky
               visions={visions}
@@ -433,6 +456,19 @@ export default function App() {
             <div className="text-[10px] font-mono opacity-30">плотность единения сознания</div>
           </div>
         </div>
+
+        <AdjacentContours
+          visions={visions}
+          activeTheme={activeTheme}
+          isAudioEnabled={isAudioEnabled}
+          onDecaySuccess={fetchVisions}
+          moonPhase={moonPhase}
+          setMoonPhase={setMoonPhase}
+          season={season}
+          setSeason={setSeason}
+          visitFreq={visitFreq}
+          setVisitFreq={setVisitFreq}
+        />
 
         {/* Bento List Layout of All Visions (Interactive Journal) */}
         <section className="space-y-4" id="journal-section">
@@ -548,6 +584,7 @@ export default function App() {
               ambientAudio.playChime(selectedVision.x / 100, selectedVision.y / 100);
             }
           }}
+          onUpdateVisions={fetchVisions}
         />
       )}
 

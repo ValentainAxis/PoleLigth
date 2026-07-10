@@ -8,6 +8,8 @@ interface CanvasFieldProps {
   onVisionClick: (vision: Vision) => void;
   onPlantClick: (x: number, y: number) => void;
   isAudioEnabled: boolean;
+  windIntensity?: number;
+  fireflySpeed?: number;
 }
 
 interface Spore {
@@ -49,6 +51,8 @@ export default function CanvasField({
   onVisionClick,
   onPlantClick,
   isAudioEnabled,
+  windIntensity,
+  fireflySpeed = 1.0,
 }: CanvasFieldProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -174,10 +178,12 @@ export default function CanvasField({
       ctx.clearRect(0, 0, width, height);
 
       // Smoothly interpolate wind intensity over time
-      if (state.time % 240 === 0) {
+      if (windIntensity !== undefined) {
+        state.targetWindIntensity = windIntensity;
+      } else if (state.time % 240 === 0) {
         state.targetWindIntensity = 0.2 + Math.random() * 0.8;
       }
-      state.windIntensity += (state.targetWindIntensity - state.windIntensity) * 0.01;
+      state.windIntensity += (state.targetWindIntensity - state.windIntensity) * 0.015;
       if (isAudioEnabled) {
         ambientAudio.setWindIntensity(state.windIntensity);
       }
@@ -446,13 +452,14 @@ export default function CanvasField({
 
         // Cap speed
         const speed = Math.sqrt(ff.vx * ff.vx + ff.vy * ff.vy);
-        if (speed > 0.35) {
-          ff.vx = (ff.vx / speed) * 0.35;
-          ff.vy = (ff.vy / speed) * 0.35;
+        const maxSpeed = 0.35 * fireflySpeed;
+        if (speed > maxSpeed && speed > 0) {
+          ff.vx = (ff.vx / speed) * maxSpeed;
+          ff.vy = (ff.vy / speed) * maxSpeed;
         }
 
-        ff.x += ff.vx;
-        ff.y += ff.vy;
+        ff.x += ff.vx * fireflySpeed;
+        ff.y += ff.vy * fireflySpeed;
 
         // Keep inside canvas frame gracefully
         if (ff.x < 5 || ff.x > 95) ff.vx *= -1;
