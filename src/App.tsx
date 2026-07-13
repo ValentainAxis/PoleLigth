@@ -5,8 +5,7 @@ import CanvasField from "./components/CanvasField";
 import ConstellationSky from "./components/ConstellationSky";
 import VisionForm from "./components/VisionForm";
 import VisionViewer from "./components/VisionViewer";
-import AdjacentContours from "./components/AdjacentContours";
-import WorkspacePortal from "./components/WorkspacePortal";
+import SpiritViewer from "./components/SpiritViewer";
 import {
   Volume2,
   VolumeX,
@@ -19,8 +18,7 @@ import {
   Clock,
   ExternalLink,
   ChevronRight,
-  Heart,
-  HardDrive
+  Heart
 } from "lucide-react";
 
 // Definitions of gorgeous ambient themes matching times of day
@@ -89,12 +87,7 @@ export default function App() {
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const [volume, setVolume] = useState(0.5);
 
-  const [viewMode, setViewMode] = useState<"field" | "constellations" | "workspace">("field");
-
-  // Semantic wind, moon, and visit frequency states
-  const [moonPhase, setMoonPhase] = useState<number>(0.5);
-  const [season, setSeason] = useState<"winter" | "spring" | "summer" | "autumn">("autumn");
-  const [visitFreq, setVisitFreq] = useState<"rare" | "balanced" | "deep">("balanced");
+  const [viewMode, setViewMode] = useState<"field" | "constellations">("field");
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,6 +95,7 @@ export default function App() {
   // UI Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [isSpiritOpen, setIsSpiritOpen] = useState(false);
   const [selectedVision, setSelectedVision] = useState<Vision | null>(null);
   const [plantCoords, setPlantCoords] = useState({ x: 50, y: 50 });
 
@@ -389,23 +383,12 @@ export default function App() {
               <Sparkles className="w-3.5 h-3.5" />
               <span>Созвездия Памяти & Свитки</span>
             </button>
-            <button
-              onClick={() => setViewMode("workspace")}
-              className={`flex items-center gap-2 py-2 px-4 sm:px-5 rounded-xl text-xs font-mono tracking-wider transition-all duration-300 cursor-pointer ${
-                viewMode === "workspace"
-                  ? "bg-white/10 text-emerald-300 font-medium shadow-md"
-                  : "text-white/40 hover:text-white/75"
-              }`}
-            >
-              <HardDrive className="w-3.5 h-3.5" />
-              <span>Эфирные Сферы Google</span>
-            </button>
           </div>
         </div>
 
         {/* Loading Indicator / Canvas Field */}
         <div className="relative" id="field-viewport">
-          {isLoading && viewMode !== "workspace" && (
+          {isLoading && (
             <div className="absolute inset-0 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center rounded-3xl z-40 animate-fade-in gap-4 border border-white/5">
               <span className="w-8 h-8 border-3 border-white/25 border-t-white rounded-full animate-spin" />
               <p className="text-xs font-mono tracking-widest text-white/70 uppercase">
@@ -416,37 +399,27 @@ export default function App() {
 
           {viewMode === "field" ? (
             (() => {
-              const derivedWindIntensity = season === "winter" ? 0.95 : season === "autumn" ? 0.7 : season === "spring" ? 0.45 : 0.25;
-              const derivedFireflySpeed = visitFreq === "rare" ? 1.8 : visitFreq === "deep" ? 0.35 : 1.0;
+              const derivedWindIntensity = activeTheme.id === "night" ? 0.75 : activeTheme.id === "dawn" ? 0.45 : activeTheme.id === "noon" ? 0.2 : 0.55;
+              const derivedFireflySpeed = activeTheme.id === "night" ? 1.4 : activeTheme.id === "noon" ? 0.4 : activeTheme.id === "dawn" ? 0.8 : 1.1;
               return (
                 <CanvasField
                   visions={visions}
                   activeTheme={activeTheme}
                   onVisionClick={handleVisionClick}
                   onPlantClick={handlePlantClick}
+                  onSpiritClick={() => setIsSpiritOpen(true)}
                   isAudioEnabled={isAudioEnabled}
                   windIntensity={derivedWindIntensity}
                   fireflySpeed={derivedFireflySpeed}
                 />
               );
             })()
-          ) : viewMode === "constellations" ? (
+          ) : (
             <ConstellationSky
               visions={visions}
               activeTheme={activeTheme}
               onVisionClick={handleVisionClick}
               isAudioEnabled={isAudioEnabled}
-            />
-          ) : (
-            <WorkspacePortal
-              activeTheme={activeTheme}
-              visions={visions}
-              isAudioEnabled={isAudioEnabled}
-              onTriggerRipple={() => {
-                if (isAudioEnabled) {
-                  ambientAudio.playChime(0.5, 0.5);
-                }
-              }}
             />
           )}
         </div>
@@ -480,19 +453,6 @@ export default function App() {
             <div className="text-[10px] font-mono opacity-30">плотность единения сознания</div>
           </div>
         </div>
-
-        <AdjacentContours
-          visions={visions}
-          activeTheme={activeTheme}
-          isAudioEnabled={isAudioEnabled}
-          onDecaySuccess={fetchVisions}
-          moonPhase={moonPhase}
-          setMoonPhase={setMoonPhase}
-          season={season}
-          setSeason={setSeason}
-          visitFreq={visitFreq}
-          setVisitFreq={setVisitFreq}
-        />
 
         {/* Bento List Layout of All Visions (Interactive Journal) */}
         <section className="space-y-4" id="journal-section">
@@ -609,6 +569,21 @@ export default function App() {
             }
           }}
           onUpdateVisions={fetchVisions}
+        />
+      )}
+
+      {/* 3. Modal Spirit of the Field Viewer */}
+      {isSpiritOpen && (
+        <SpiritViewer
+          activeTheme={activeTheme}
+          onClose={() => setIsSpiritOpen(false)}
+          isAudioEnabled={isAudioEnabled}
+          onTriggerRipple={() => {
+            // Trigger a beautiful audio bell and ripple on canvas
+            if (isAudioEnabled) {
+              ambientAudio.playChime(0.5, 0.4, "fifth");
+            }
+          }}
         />
       )}
 

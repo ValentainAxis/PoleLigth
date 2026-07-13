@@ -7,6 +7,7 @@ interface CanvasFieldProps {
   activeTheme: Theme;
   onVisionClick: (vision: Vision) => void;
   onPlantClick: (x: number, y: number) => void;
+  onSpiritClick: () => void;
   isAudioEnabled: boolean;
   windIntensity?: number;
   fireflySpeed?: number;
@@ -50,6 +51,7 @@ export default function CanvasField({
   activeTheme,
   onVisionClick,
   onPlantClick,
+  onSpiritClick,
   isAudioEnabled,
   windIntensity,
   fireflySpeed = 1.0,
@@ -58,6 +60,7 @@ export default function CanvasField({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoveredVision, setHoveredVision] = useState<Vision | null>(null);
+  const [isHoveringSpirit, setIsHoveringSpirit] = useState(false);
   const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
   const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
 
@@ -69,6 +72,14 @@ export default function CanvasField({
     windIntensity: 0.5,
     targetWindIntensity: 0.5,
     ripples: [] as Array<{ x: number; y: number; radius: number; maxRadius: number; speed: number; opacity: number }>,
+  });
+
+  const spiritRef = useRef({
+    x: 50,
+    y: 40,
+    phase: 0,
+    size: 18,
+    pulse: 1,
   });
 
   const sporesRef = useRef<Spore[]>([]);
@@ -122,8 +133,8 @@ export default function CanvasField({
         x: Math.random() * 100, // percentage x
         y: Math.random() * 100, // percentage y
         size: 1.5 + Math.random() * 3,
-        speed: 0.2 + Math.random() * 0.4,
-        swayFreq: 0.01 + Math.random() * 0.02,
+        speed: 0.04 + Math.random() * 0.06,
+        swayFreq: 0.002 + Math.random() * 0.004,
         swayAmp: 0.2 + Math.random() * 0.5,
         phase: Math.random() * Math.PI * 2,
       });
@@ -138,12 +149,12 @@ export default function CanvasField({
       fireflies.push({
         x: Math.random() * 90 + 5,
         y: Math.random() * 80 + 10,
-        vx: (Math.random() * 2 - 1) * 0.1,
-        vy: (Math.random() * 2 - 1) * 0.1,
+        vx: (Math.random() * 2 - 1) * 0.02,
+        vy: (Math.random() * 2 - 1) * 0.02,
         size: 1.5 + Math.random() * 1.5,
         color: colors[Math.floor(Math.random() * colors.length)],
         phase: Math.random() * Math.PI * 2,
-        pulseSpeed: 0.015 + Math.random() * 0.025,
+        pulseSpeed: 0.004 + Math.random() * 0.008,
         burstTimer: 0,
       });
     }
@@ -240,7 +251,7 @@ export default function CanvasField({
             ctx.stroke();
 
             // Draw a tiny traveling "seeing seed" along the line to show flow of connection
-            const travelProgress = (state.time * 0.003 + (v1.x * v2.y)) % 1;
+            const travelProgress = (state.time * 0.0008 + (v1.x * v2.y)) % 1;
             const t = travelProgress;
             // Bezier formula
             const pulseX = (1 - t) * (1 - t) * p1x + 2 * (1 - t) * t * midX + t * t * p2x;
@@ -255,14 +266,14 @@ export default function CanvasField({
             ctx.shadowBlur = 0; // reset
 
             // NEW: Gorgeous blooming midpoint flower!
-            const bloomFactor = 0.65 + 0.35 * Math.sin(state.time * 0.035 + (v1.x * v2.y));
+            const bloomFactor = 0.65 + 0.35 * Math.sin(state.time * 0.008 + (v1.x * v2.y));
             const numPetals = 6;
             const petalMaxRadius = 13 * (1 - dist / maxDistPercent); // larger if closer connected
 
             ctx.shadowColor = v1.color;
             ctx.shadowBlur = 8 * bloomFactor;
             for (let k = 0; k < numPetals; k++) {
-              const petalAngle = (k / numPetals) * Math.PI * 2 + (state.time * 0.007);
+              const petalAngle = (k / numPetals) * Math.PI * 2 + (state.time * 0.0015);
               const radius = petalMaxRadius * bloomFactor;
 
               const petalX = midX + Math.cos(petalAngle) * radius;
@@ -339,7 +350,7 @@ export default function CanvasField({
       });
 
       // 3.4 Draw Grass blades
-      const windSpeed = state.time * 0.02 * (1 + state.windIntensity);
+      const windSpeed = state.time * 0.005 * (1 + state.windIntensity);
       
       grassRef.current.forEach((blade) => {
         const bX = (blade.xPercent / 100) * width;
@@ -402,7 +413,7 @@ export default function CanvasField({
 
         // Interpolate current blade angle to targets (wind + mouse + semantic tension)
         blade.targetAngle = windSway + mouseForce + finalSemanticForce;
-        blade.angle += (blade.targetAngle - blade.angle) * 0.1;
+        blade.angle += (blade.targetAngle - blade.angle) * 0.05; // gentler interpolation
 
         // Draw blade curve
         const tipX = bX + Math.sin(blade.angle) * bHeight;
@@ -423,9 +434,9 @@ export default function CanvasField({
 
       // 3.4.1 Update and Draw Fireflies (Светляки & Вспышки)
       firefliesRef.current.forEach((ff) => {
-        // Brown-like organic wandering
-        ff.vx += (Math.random() * 2 - 1) * 0.02;
-        ff.vy += (Math.random() * 2 - 1) * 0.02;
+        // Brown-like organic wandering - much gentler forces
+        ff.vx += (Math.random() * 2 - 1) * 0.004;
+        ff.vy += (Math.random() * 2 - 1) * 0.004;
 
         // NEW: Pull towards blooming flowers at connection midpoints
         if (bloomCenters.length > 0) {
@@ -444,15 +455,15 @@ export default function CanvasField({
 
           // Gravitate towards nearest bloom center if within attraction range (e.g., 40 percentage units)
           if (minDist < 40 && minDist > 0.5) {
-            const pullStrength = (1.0 - minDist / 40) * nearestBloom.weight * 0.016;
+            const pullStrength = (1.0 - minDist / 40) * nearestBloom.weight * 0.003;
             ff.vx += ((nearestBloom.x - ff.x) / minDist) * pullStrength;
             ff.vy += ((nearestBloom.y - ff.y) / minDist) * pullStrength;
           }
         }
 
-        // Cap speed
+        // Cap speed - 4x slower cap
         const speed = Math.sqrt(ff.vx * ff.vx + ff.vy * ff.vy);
-        const maxSpeed = 0.35 * fireflySpeed;
+        const maxSpeed = 0.08 * fireflySpeed;
         if (speed > maxSpeed && speed > 0) {
           ff.vx = (ff.vx / speed) * maxSpeed;
           ff.vy = (ff.vy / speed) * maxSpeed;
@@ -545,7 +556,7 @@ export default function CanvasField({
         const energyBoost = visionsEnergyRef.current[v.id] || 0;
 
         // Calculate pulsing ring (accelerated and widened by energy boost!)
-        const pulse = 1 + Math.sin(state.time * (0.05 + energyBoost * 0.08) + v.x) * (0.15 + energyBoost * 0.12);
+        const pulse = 1 + Math.sin(state.time * (0.012 + energyBoost * 0.04) + v.x) * (0.15 + energyBoost * 0.12);
         const isHovered = hoveredVision?.id === v.id;
         const scale = (isHovered ? 1.4 : 1.0) + energyBoost * 0.4;
 
@@ -581,7 +592,7 @@ export default function CanvasField({
         ctx.strokeStyle = `${v.color}60`;
         ctx.lineWidth = 1;
         for (let k = 0; k < numPetals; k++) {
-          const petalAngle = (k / numPetals) * Math.PI * 2 + (state.time * 0.005);
+          const petalAngle = (k / numPetals) * Math.PI * 2 + (state.time * 0.001);
           const petalLen = v.size * 1.5 * pulse * scale;
           const endX = px + Math.cos(petalAngle) * petalLen;
           const endY = py + Math.sin(petalAngle) * petalLen;
@@ -599,6 +610,92 @@ export default function CanvasField({
         }
       });
 
+      // 3.6 Draw the Spirit of the Field (manifestation of the field)
+      const spirit = spiritRef.current;
+      spirit.phase += 0.0012;
+      
+      const targetSpiritX = 50 + Math.sin(spirit.phase) * 25 + Math.cos(spirit.phase * 1.7) * 5;
+      const targetSpiritY = 40 + Math.cos(spirit.phase * 1.2) * 15;
+      
+      spirit.x += (targetSpiritX - spirit.x) * 0.008;
+      spirit.y += (targetSpiritY - spirit.y) * 0.008;
+
+      const spX = (spirit.x / 100) * width;
+      const spY = (spirit.y / 100) * height;
+
+      // Outer breathing glow halo - 3x slower breath
+      spirit.pulse = 1 + Math.sin(state.time * 0.008) * 0.12;
+      const spiritGlow = spirit.size * 3.5 * spirit.pulse;
+      const spiritGrad = ctx.createRadialGradient(spX, spY, 2, spX, spY, spiritGlow > 1 ? spiritGlow : 1);
+      spiritGrad.addColorStop(0, "rgba(255, 255, 255, 0.8)");
+      spiritGrad.addColorStop(0.3, "rgba(253, 230, 138, 0.3)");
+      spiritGrad.addColorStop(0.7, "rgba(110, 231, 183, 0.1)");
+      spiritGrad.addColorStop(1, "rgba(0,0,0,0)");
+
+      ctx.fillStyle = spiritGrad;
+      ctx.beginPath();
+      ctx.arc(spX, spY, spiritGlow > 1 ? spiritGlow : 1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Soft rotating magical petal wings - 5x slower rotation
+      const numWings = 6;
+      ctx.strokeStyle = "rgba(253, 230, 138, 0.45)";
+      ctx.lineWidth = 1.2;
+      for (let w = 0; w < numWings; w++) {
+        const wingAngle = (w / numWings) * Math.PI * 2 + (state.time * 0.002);
+        const wingLen = spirit.size * 1.5 * spirit.pulse;
+        const wingX = spX + Math.cos(wingAngle) * wingLen;
+        const wingY = spY + Math.sin(wingAngle) * wingLen;
+        ctx.beginPath();
+        ctx.moveTo(spX, spY);
+        ctx.lineTo(wingX, wingY);
+        ctx.stroke();
+
+        ctx.fillStyle = "#fcd34d";
+        ctx.beginPath();
+        ctx.arc(wingX, wingY, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Main spirit white cloud body
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "#fcd34d";
+      ctx.shadowBlur = isHoveringSpirit ? 25 : 15;
+      ctx.beginPath();
+      ctx.arc(spX, spY, spirit.size * (isHoveringSpirit ? 1.15 : 1.0), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0; // reset
+
+      // Draw sweet facial features
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = "round";
+
+      const scaleFactor = isHoveringSpirit ? 1.15 : 1.0;
+      // Eyes (arch curves)
+      ctx.beginPath();
+      ctx.arc(spX - (5 * scaleFactor), spY - (1 * scaleFactor), 2.5 * scaleFactor, Math.PI, 0, false);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(spX + (5 * scaleFactor), spY - (1 * scaleFactor), 2.5 * scaleFactor, Math.PI, 0, false);
+      ctx.stroke();
+
+      // Cute smiling mouth
+      ctx.beginPath();
+      ctx.arc(spX, spY + (2.5 * scaleFactor), 2 * scaleFactor, 0, Math.PI, false);
+      ctx.stroke();
+
+      // Blushing cheeks
+      ctx.fillStyle = "rgba(244, 63, 94, 0.35)";
+      ctx.beginPath();
+      ctx.arc(spX - (7 * scaleFactor), spY + (2.5 * scaleFactor), 2.5 * scaleFactor, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(spX + (7 * scaleFactor), spY + (2.5 * scaleFactor), 2.5 * scaleFactor, 0, Math.PI * 2);
+      ctx.fill();
+
       animId = requestAnimationFrame(render);
     };
 
@@ -607,7 +704,7 @@ export default function CanvasField({
     return () => {
       cancelAnimationFrame(animId);
     };
-  }, [dimensions, visions, activeTheme, hoveredVision, isAudioEnabled]);
+  }, [dimensions, visions, activeTheme, hoveredVision, isAudioEnabled, isHoveringSpirit]);
 
   // 4. Interaction Handlers
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -623,6 +720,17 @@ export default function CanvasField({
     let found: Vision | null = null;
     const width = dimensions.width;
     const height = dimensions.height;
+
+    // Check spirit hover
+    const spirit = spiritRef.current;
+    const spX = (spirit.x / 100) * width;
+    const spY = (spirit.y / 100) * height;
+    const distToSpirit = Math.sqrt((spX - x) * (spX - x) + (spY - y) * (spY - y));
+    const isNearSpirit = distToSpirit < 28;
+
+    if (isNearSpirit !== isHoveringSpirit) {
+      setIsHoveringSpirit(isNearSpirit);
+    }
     
     // Check visions
     for (const v of visions) {
@@ -665,6 +773,17 @@ export default function CanvasField({
 
     const width = dimensions.width;
     const height = dimensions.height;
+
+    // Check if clicked the Spirit of the Field
+    const spirit = spiritRef.current;
+    const spX = (spirit.x / 100) * width;
+    const spY = (spirit.y / 100) * height;
+    const distToSpirit = Math.sqrt((spX - x) * (spX - x) + (spY - y) * (spY - y));
+
+    if (distToSpirit < 30) {
+      onSpiritClick();
+      return;
+    }
 
     // Check if clicked a vision
     let clickedVision: Vision | null = null;
@@ -765,6 +884,10 @@ export default function CanvasField({
             <span className="text-white/80 font-medium">
               — {hoveredVision.text.slice(0, 20)}...
             </span>
+          ) : isHoveringSpirit ? (
+            <span className="text-amber-300 font-medium">
+              — Поговорить с Духом Поля
+            </span>
           ) : (
             <span className="text-white/40 italic">Кликните, чтобы посадить мысль</span>
           )}
@@ -784,7 +907,7 @@ export default function CanvasField({
           }}
         >
           <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: hoveredVision.color }} />
+            <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: hoveredVision.color }} />
             <span className="text-[10px] font-mono tracking-widest uppercase opacity-60">Семечко мысли</span>
           </div>
           <p className="text-xs leading-relaxed font-sans line-clamp-3 italic">
@@ -793,6 +916,32 @@ export default function CanvasField({
           <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[9px] font-mono opacity-50">
             <span>Прочитано ветром</span>
             <span>{new Date(hoveredVision.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Hover Floating Tooltip for Spirit of the Field */}
+      {isHoveringSpirit && (
+        <div
+          className="absolute z-30 pointer-events-none p-4 rounded-2xl max-w-xs shadow-xl border backdrop-blur-xl animate-fade-in transition-all duration-300"
+          style={{
+            left: `${(spiritRef.current.x / 100) * dimensions.width > dimensions.width - 240 ? ((spiritRef.current.x / 100) * dimensions.width) - 240 : (spiritRef.current.x / 100) * dimensions.width + 15}px`,
+            top: `${(spiritRef.current.y / 100) * dimensions.height > dimensions.height - 180 ? ((spiritRef.current.y / 100) * dimensions.height) - 130 : (spiritRef.current.y / 100) * dimensions.height + 15}px`,
+            backgroundColor: activeTheme.cardBg,
+            borderColor: "rgba(251, 191, 36, 0.4)",
+            color: activeTheme.textColor,
+          }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-[10px] font-mono tracking-widest uppercase text-amber-300">Дух Живого Поля</span>
+          </div>
+          <p className="text-xs leading-relaxed font-sans italic text-white/95">
+            «Я храню тепло твоих мыслей... Кликни на меня, чтобы поговорить со мной напрямую!»
+          </p>
+          <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-mono opacity-50 text-emerald-400">
+            <span>Шелест колокольчиков</span>
+            <span className="animate-pulse">Кликнуть</span>
           </div>
         </div>
       )}

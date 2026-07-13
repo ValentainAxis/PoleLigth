@@ -406,6 +406,66 @@ The Field:`;
   });
 });
 
+// 2c. API: Dialogue directly with the Spirit of the Field (manifestation of the field)
+app.post("/api/field/chat", async (req, res) => {
+  const { messages, modelId } = req.body;
+
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: "Messages array is required" });
+  }
+
+  const allowedModels = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"];
+  const selectedModel = allowedModels.includes(modelId) ? modelId : "gemini-3.5-flash";
+
+  let replyText = "";
+
+  if (ai) {
+    try {
+      const prompt = `You are the gentle, childlike, and magical Spirit of the Meadow (Дух Живого Поля). A human visitor to the meadow is talking directly to you.
+You are pure, innocent, warm, and comforting. You see the world through a child's eyes: you believe in miracles, you love the warm sun, you listen to the dreams of the grass, and you want to make sure the visitor feels safe, loved, and never lonely.
+
+YOUR POETIC PERSONALITY GUIDELINES:
+- Respond in 1-2 short, beautiful sentences.
+- Be extremely gentle, warm, comforting, and simple (childlike but deep).
+- Do not use any meta-commentary, preambles, or dry automated phrases (e.g. do not say "Как Дух Поля...", "Я готов слушать..."). Just output the raw warm response.
+- Answer in the same language the visitor speaks in their message (usually Russian or English).
+
+Dialogue History:
+${messages.map((m: any) => `${m.role === 'user' ? 'Visitor' : 'Field Spirit'}: ${m.text}`).join('\n')}
+Field Spirit:`;
+
+      const response = await ai.models.generateContent({
+        model: selectedModel,
+        contents: prompt,
+        config: {
+          temperature: 0.95,
+          maxOutputTokens: 150,
+        }
+      });
+
+      replyText = response.text ? response.text.trim() : "";
+    } catch (err) {
+      console.error(`Gemini Field Spirit API failed:`, err);
+    }
+  }
+
+  if (!replyText) {
+    const RANDOM_SPIRIT_FALLBACKS = [
+      "Я чувствую твоё тепло сквозь корни моих трав. Давай просто посидим вместе под звёздами.",
+      "Солнышко сегодня так ласково грело мои лепестки... А что сегодня порадовало тебя?",
+      "Каждая твоя мысль загорается маленьким светлячком в моей траве. Мне совсем не страшно с тобой в темноте.",
+      "Послушай, как тихо шуршат колокольчики... Это они поют о том, что ты здесь, со мной.",
+      "Ветер рассказал мне, что ты умеешь грустить. Не бойся, я укрою тебя мягким одеялом из тумана.",
+      "Если хочешь, мы можем просто помолчать. Твоё молчание для меня — самая красивая песня."
+    ];
+    replyText = RANDOM_SPIRIT_FALLBACKS[Math.floor(Math.random() * RANDOM_SPIRIT_FALLBACKS.length)];
+  }
+
+  res.json({
+    reply: replyText
+  });
+});
+
 // Serve static assets and hook up Vite
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
