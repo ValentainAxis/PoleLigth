@@ -11,7 +11,7 @@ This guide walks you through migrating PoleLigth from local JSON file storage to
 ✅ **Backup & recovery** — Automatic daily backups  
 ✅ **Security** — Built-in authentication and rules  
 ✅ **Free tier** — 100GB storage, 100 concurrent connections  
-✅ **Easy deployment** — Works seamlessly with Cloud Run, Vercel, etc.
+✅ **Easy deployment** — Works seamlessly with Cloud Run, Vercel, etc.  
 
 ---
 
@@ -210,7 +210,7 @@ poligth-abc123 (root)
 All API endpoints now use Firebase instead of local JSON files:
 
 | Endpoint | Method | Changes |
-|----------|--------|---------|
+|----------|--------|----------|
 | `/api/visions` | GET | Returns from Firebase |
 | `/api/visions` | POST | Saves to Firebase |
 | `/api/visions/:id/chat` | POST | Updates messages in Firebase |
@@ -328,7 +328,7 @@ In Firebase Console:
 ✅ Enable Firebase Authentication (optional)  
 ✅ Add Firestore for complex queries  
 ✅ Set up Cloud Functions for scheduled tasks  
-✅ Enable Firebase Analytics for user insights
+✅ Enable Firebase Analytics for user insights  
 
 ---
 
