@@ -4,7 +4,6 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import firebaseService, { initializeFirebase } from "./src/services/firebaseService";
 
 dotenv.config();
 
@@ -13,11 +12,92 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Initialize Firebase at startup
-try {
-  initializeFirebase();
-} catch (error) {
-  console.error("Failed to initialize Firebase. App will run with fallback mode.");
+// Path for storing persistent visions
+const DATA_DIR = path.join(process.cwd(), "data");
+const VISIONS_FILE = path.join(DATA_DIR, "visions.json");
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Initial seed visions
+const DEFAULT_VISIONS = [
+  {
+    id: "seed-1",
+    text: "Мне всегда казалось, что звёзды светят только для тех, кто разучился спать от одиночества.",
+    whisper: "Они смотрят вниз, отражаясь в каплях росы, и в этом зеркале ночное небо больше не одиноко.",
+    x: 25,
+    y: 35,
+    color: "#f59e0b", // Amber glow
+    size: 15,
+    createdAt: new Date(Date.now() - 3600000 * 24).toISOString()
+  },
+  {
+    id: "seed-2",
+    text: "Sometimes I stand in the wind just to feel like something is holding me.",
+    whisper: "The wind doesn't hold you back; it flows with you, whispering that you don't have to stand alone.",
+    x: 75,
+    y: 45,
+    color: "#10b981", // Emerald glow
+    size: 14,
+    createdAt: new Date(Date.now() - 3600000 * 12).toISOString()
+  },
+  {
+    id: "seed-3",
+    text: "Тишина здесь такая полная, будто земля затаила дыхание, чтобы расслышать мои мысли.",
+    whisper: "Твои мысли прорастают сквозь почву диким клевером и мятой. Поле слушает и помнит твой след.",
+    x: 45,
+    y: 70,
+    color: "#6366f1", // Indigo glow
+    size: 16,
+    createdAt: new Date(Date.now() - 3600000 * 6).toISOString()
+  },
+  {
+    id: "seed-4",
+    text: "Я ищу кого-то, кто увидит во мне не просто силуэт, а свет, который я так усердно прячу.",
+    whisper: "Свет не нужно прятать во тьме стеблей. Здесь каждая искра находит своё созвездие в траве.",
+    x: 80,
+    y: 75,
+    color: "#ec4899", // Pink glow
+    size: 13,
+    createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
+  },
+  {
+    id: "seed-5",
+    text: "Мы все — просто семена, летящие по ветру в поисках своего клочка земли.",
+    whisper: "Но падая в одну почву, мы прорастаем единым полем. А поле никогда не бывает одиноким.",
+    x: 18,
+    y: 65,
+    color: "#a855f7", // Purple glow
+    size: 15,
+    createdAt: new Date(Date.now() - 3600000 * 1).toISOString()
+  }
+];
+
+// Helper to load visions
+function loadVisions() {
+  try {
+    if (fs.existsSync(VISIONS_FILE)) {
+      const data = fs.readFileSync(VISIONS_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error("Error loading visions, resetting to seeds:", error);
+  }
+  
+  // Save defaults if file doesn't exist or is corrupted
+  saveVisions(DEFAULT_VISIONS);
+  return DEFAULT_VISIONS;
+}
+
+// Helper to save visions
+function saveVisions(visions: any[]) {
+  try {
+    fs.writeFileSync(VISIONS_FILE, JSON.stringify(visions, null, 2), "utf-8");
+  } catch (error) {
+    console.error("Error saving visions:", error);
+  }
 }
 
 // Initialize Gemini SDK with client-side proxying pattern
@@ -34,12 +114,12 @@ if (apiKey && apiKey !== "MY_GEMINI_API_KEY") {
         }
       }
     });
-    console.log("✅ Gemini API initialized successfully.");
+    console.log("Gemini API initialized successfully.");
   } catch (err) {
-    console.error("❌ Failed to initialize Gemini API Client:", err);
+    console.error("Failed to initialize Gemini API Client:", err);
   }
 } else {
-  console.log("⚠️  No valid GEMINI_API_KEY found in env. Running with poetic fallback engines.");
+  console.log("No valid GEMINI_API_KEY found in env. Running with poetic fallback engines.");
 }
 
 // Poetic fallbacks in case API fails or key is missing
@@ -53,61 +133,102 @@ const FALLBACK_WHISPERS = [
   "Почва под твоими ногами хранит тепло всех, кто смотрел на неё с надеждой."
 ];
 
-// ============================================================================
-// API ENDPOINTS
-// ============================================================================
+const ROOT_SYSTEM_FILE = path.join(DATA_DIR, "root_system.json");
+
+// Default subterranean archaeological records
+const DEFAULT_ROOT_RUNES = [
+  {
+    id: "fossil-1",
+    text: "Когда-то здесь бушевал океан, но теперь осталась лишь память о его приливах.",
+    whisper: "Глубоко под пластами времени соль древних вод питает корни сегодняшних цветов.",
+    x: 35,
+    y: 40,
+    color: "#3b82f6",
+    size: 13,
+    createdAt: new Date(Date.now() - 3600000 * 24 * 30).toISOString(),
+    decayedAt: new Date(Date.now() - 3600000 * 24 * 15).toISOString(),
+    runeX: 25,
+    runeY: 35,
+    runeShape: "◈"
+  },
+  {
+    id: "fossil-2",
+    text: "Мы забываем имена, но почва помнит каждый шаг, сделанный в сторону рассвета.",
+    whisper: "Смысл не стёрся, он просто лёг спать под одеялом из перегноя и опавших звёзд.",
+    x: 65,
+    y: 75,
+    color: "#a855f7",
+    size: 12,
+    createdAt: new Date(Date.now() - 3600000 * 24 * 60).toISOString(),
+    decayedAt: new Date(Date.now() - 3600000 * 24 * 40).toISOString(),
+    runeX: 75,
+    runeY: 60,
+    runeShape: "▲"
+  }
+];
+
+function loadRootSystem() {
+  try {
+    if (fs.existsSync(ROOT_SYSTEM_FILE)) {
+      const data = fs.readFileSync(ROOT_SYSTEM_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error("Error loading root system, resetting to seeds:", error);
+  }
+  saveRootSystem(DEFAULT_ROOT_RUNES);
+  return DEFAULT_ROOT_RUNES;
+}
+
+function saveRootSystem(data: any[]) {
+  try {
+    fs.writeFileSync(ROOT_SYSTEM_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch (error) {
+    console.error("Error saving root system:", error);
+  }
+}
 
 // 1. API: Get all visions
-app.get("/api/visions", async (req, res) => {
-  try {
-    const visions = await firebaseService.getVisions();
-    res.json(visions);
-  } catch (error) {
-    console.error("Error fetching visions:", error);
-    res.status(500).json({ error: "Failed to fetch visions from database" });
-  }
+app.get("/api/visions", (req, res) => {
+  const visions = loadVisions();
+  res.json(visions);
 });
 
 // 1b. API: Get all root system runes
-app.get("/api/root_system", async (req, res) => {
-  try {
-    const runes = await firebaseService.getRootSystem();
-    res.json(runes);
-  } catch (error) {
-    console.error("Error fetching root system:", error);
-    res.status(500).json({ error: "Failed to fetch root system" });
-  }
+app.get("/api/root_system", (req, res) => {
+  const runes = loadRootSystem();
+  res.json(runes);
 });
 
 // 1c. API: Decay an active vision into root system
-app.post("/api/visions/:id/decay", async (req, res) => {
+app.post("/api/visions/:id/decay", (req, res) => {
   const { id } = req.params;
-
-  try {
-    const vision = await firebaseService.getVision(id);
-    if (!vision) {
-      return res.status(404).json({ error: "Vision not found" });
-    }
-
-    // Remove from active visions
-    await firebaseService.deleteVision(id);
-
-    // Add to root system
-    const shapes = ["▲", "◆", "▼", "◈", "◇", "⬡", "✦", "⚙"];
-    const newRune = {
-      ...vision,
-      decayedAt: new Date().toISOString(),
-      runeX: Math.random() * 80 + 10,
-      runeY: Math.random() * 80 + 10,
-      runeShape: shapes[Math.floor(Math.random() * shapes.length)]
-    };
-    await firebaseService.saveRootRune(newRune);
-
-    res.json({ success: true, rune: newRune });
-  } catch (error) {
-    console.error("Error decaying vision:", error);
-    res.status(500).json({ error: "Failed to decay vision" });
+  const visions = loadVisions();
+  const index = visions.findIndex((v: any) => v.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: "Vision not found" });
   }
+
+  const decayedVision = visions[index];
+  
+  // Remove from active visions
+  visions.splice(index, 1);
+  saveVisions(visions);
+
+  // Add to root system
+  const runes = loadRootSystem();
+  const shapes = ["▲", "◆", "▼", "◈", "◇", "⬡", "✦", "⚙"];
+  const newRune = {
+    ...decayedVision,
+    decayedAt: new Date().toISOString(),
+    runeX: Math.random() * 80 + 10,
+    runeY: Math.random() * 80 + 10,
+    runeShape: shapes[Math.floor(Math.random() * shapes.length)]
+  };
+  runes.push(newRune);
+  saveRootSystem(runes);
+
+  res.json({ success: true, rune: newRune });
 });
 
 // 2. API: Plant a new vision
@@ -132,13 +253,12 @@ app.post("/api/visions", async (req, res) => {
 
   if (ai) {
     try {
-      const prompt = `You are the ambient, ancient consciousness of a vast wind-swept field. A human visitor is looking at you (the field) and has left a 'vision' (a poetic thought, a secret, or feeling):
-
+      const prompt = `You are the ambient, ancient consciousness of a vast wind-swept field. A human visitor is looking at you (the field) and has left a 'vision' (a poetic thought, a secret, or a feeling):
 "${cleanText}"
 
 Respond to their thought as the Field itself. Your response must be extremely brief (1-2 sentences), highly poetic, comforting, mysterious, and deep. 
 If the user's thought is in Russian, write your response in Russian. If in English, write in English. Otherwise, prefer Russian or English.
-Speak in a soulful tone, as the wind, the grass, the soil, or the sky. Aligned with the theme: "поле радуется не тому, что его увидели, а тому, что видение перестало быть одиноким."
+Speak in a soulful tone, as the wind, the grass, the soil, or the sky. Aligned with the theme: "поле радуется не тому, что его увидели, а тому, что видение перестало быть одиноким" (being seen/connecting dissolves loneliness).
 Do not use generic AI preambles (e.g. "Как поле...", "Я, древнее сознание..."). Just output the raw poetic response immediately.`;
 
       const response = await ai.models.generateContent({
@@ -181,13 +301,11 @@ Do not use generic AI preambles (e.g. "Как поле...", "Я, древнее 
     ]
   };
 
-  try {
-    await firebaseService.saveVision(newVision);
-    res.json(newVision);
-  } catch (error) {
-    console.error("Error saving vision to Firebase:", error);
-    res.status(500).json({ error: "Failed to save vision" });
-  }
+  const visions = loadVisions();
+  visions.push(newVision);
+  saveVisions(visions);
+
+  res.json(newVision);
 });
 
 // 2b. API: Live chat dialogue with a specific vision node
@@ -200,38 +318,37 @@ app.post("/api/visions/:id/chat", async (req, res) => {
   }
 
   const cleanMessage = message.trim();
+  const visions = loadVisions();
+  const index = visions.findIndex((v: any) => v.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: "Vision not found" });
+  }
 
-  try {
-    const vision = await firebaseService.getVision(id);
-    if (!vision) {
-      return res.status(404).json({ error: "Vision not found" });
-    }
+  const vision = visions[index];
+  if (!vision.messages) {
+    vision.messages = [
+      {
+        role: "model",
+        text: vision.whisper,
+        createdAt: vision.createdAt || new Date().toISOString()
+      }
+    ];
+  }
 
-    if (!vision.messages) {
-      vision.messages = [
-        {
-          role: "model",
-          text: vision.whisper,
-          createdAt: vision.createdAt || new Date().toISOString()
-        }
-      ];
-    }
+  const allowedModels = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"];
+  const selectedModel = allowedModels.includes(modelId) ? modelId : (vision.modelUsed || "gemini-3.5-flash");
 
-    const allowedModels = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"];
-    const selectedModel = allowedModels.includes(modelId) ? modelId : (vision.modelUsed || "gemini-3.5-flash");
+  let replyText = "";
 
-    let replyText = "";
-
-    if (ai) {
-      try {
-        const prompt = `You are the ambient, ancient consciousness of a vast wind-swept field. You are having an ongoing, soulful, poetic dialogue with a human visitor about their original vision:
-
-"${vision.text}"
+  if (ai) {
+    try {
+      // Build a beautiful chat simulation prompt with system guidelines and history
+      const prompt = `You are the ambient, ancient consciousness of a vast wind-swept field. You are having an ongoing, soulful, poetic dialogue with a human visitor about their original vision seed: "${vision.text}".
 
 YOUR POETIC PERSONALITY:
 - Comforting, mysterious, soulful, and very brief (1 to 2 sentences per response).
 - Speak as the wind, the rustling grass, the warm soil, or the twilight sky.
-- Keep the tone gentle, quiet, and deeply empathetic. The core motif remains: "поле радуется не тому, что его увидели, а тому, что видение перестало быть одиноким."
+- Keep the tone gentle, quiet, and deeply empathetic. The core motif remains: "поле радуется не тому, что его увидели, а тому, что видение перестало быть одиноким".
 - Answer in the same language the visitor speaks in their message.
 - Avoid any corporate preambles, meta-commentary, or generic intros (e.g., "О, путник...", "Я слышу твой голос..."). Just speak your true poetic essence.
 
@@ -240,60 +357,53 @@ ${vision.messages.map((m: any) => `${m.role === "user" ? "Visitor" : "The Field"
 Visitor: ${cleanMessage}
 The Field:`;
 
-        const response = await ai.models.generateContent({
-          model: selectedModel,
-          contents: prompt,
-          config: {
-            temperature: 0.95,
-            maxOutputTokens: 180,
-          }
-        });
+      const response = await ai.models.generateContent({
+        model: selectedModel,
+        contents: prompt,
+        config: {
+          temperature: 0.95,
+          maxOutputTokens: 180,
+        }
+      });
 
-        replyText = response.text ? response.text.trim() : "";
-      } catch (err) {
-        console.error(`Gemini Chat API failed for model ${selectedModel}:`, err);
-      }
+      replyText = response.text ? response.text.trim() : "";
+    } catch (err) {
+      console.error(`Gemini Chat API failed for model ${selectedModel}:`, err);
     }
-
-    if (!replyText) {
-      const RANDOM_FALLBACKS = [
-        "Твои слова колышут траву, оставляя тёплую рябь на воде.",
-        "Шёпот ветра уносит твоё послание к звёздам. Я слышу твой внутренний свет.",
-        "Стебли качаются в такт твоему голосу. Мы делимся этой тишиной вместе.",
-        "Твоё прикосновение греет остывшее к ночи поле. Поведай мне больше."
-      ];
-      replyText = RANDOM_FALLBACKS[Math.floor(Math.random() * RANDOM_FALLBACKS.length)];
-    }
-
-    // Save the conversation messages in database
-    const userMsg = {
-      role: "user",
-      text: cleanMessage,
-      createdAt: new Date().toISOString()
-    };
-    const modelMsg = {
-      role: "model",
-      text: replyText,
-      createdAt: new Date().toISOString()
-    };
-
-    vision.messages.push(userMsg);
-    vision.messages.push(modelMsg);
-    vision.modelUsed = selectedModel;
-
-    await firebaseService.updateVision(id, {
-      messages: vision.messages,
-      modelUsed: selectedModel
-    });
-
-    res.json({
-      messages: vision.messages,
-      latestReply: replyText
-    });
-  } catch (error) {
-    console.error("Error in field dialogue conversation:", error);
-    res.status(500).json({ error: "Failed to process chat message" });
   }
+
+  if (!replyText) {
+    const RANDOM_FALLBACKS = [
+      "Твои слова колышут траву, оставляя тёплую рябь на воде.",
+      "Шёпот ветра уносит твоё послание к звёздам. Я слышу твой внутренний свет.",
+      "Стебли качаются в такт твоему голосу. Мы делимся этой тишиной вместе.",
+      "Твоё прикосновение греет остывшее к ночи поле. Поведай мне больше."
+    ];
+    replyText = RANDOM_FALLBACKS[Math.floor(Math.random() * RANDOM_FALLBACKS.length)];
+  }
+
+  // Save the conversation messages in database
+  const userMsg = {
+    role: "user",
+    text: cleanMessage,
+    createdAt: new Date().toISOString()
+  };
+  const modelMsg = {
+    role: "model",
+    text: replyText,
+    createdAt: new Date().toISOString()
+  };
+
+  vision.messages.push(userMsg);
+  vision.messages.push(modelMsg);
+  vision.modelUsed = selectedModel;
+
+  saveVisions(visions);
+
+  res.json({
+    messages: vision.messages,
+    latestReply: replyText
+  });
 });
 
 // 2c. API: Dialogue directly with the Spirit of the Field (manifestation of the field)
@@ -312,7 +422,7 @@ app.post("/api/field/chat", async (req, res) => {
   if (ai) {
     try {
       const prompt = `You are the gentle, childlike, and magical Spirit of the Meadow (Дух Живого Поля). A human visitor to the meadow is talking directly to you.
-You are pure, innocent, warm, and comforting. You see the world through a child's eyes: you believe in miracles, you love the warm sun, you listen to the dreams of the grass, and you want to make everyone feel at home in this sacred space.
+You are pure, innocent, warm, and comforting. You see the world through a child's eyes: you believe in miracles, you love the warm sun, you listen to the dreams of the grass, and you want to make sure the visitor feels safe, loved, and never lonely.
 
 YOUR POETIC PERSONALITY GUIDELINES:
 - Respond in 1-2 short, beautiful sentences.
@@ -356,10 +466,7 @@ Field Spirit:`;
   });
 });
 
-// ============================================================================
-// SERVE STATIC ASSETS AND HOOK UP VITE
-// ============================================================================
-
+// Serve static assets and hook up Vite
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -376,13 +483,8 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🌾 PoleLigth server running at http://0.0.0.0:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔥 Firebase: ${process.env.FIREBASE_DATABASE_URL ? 'Connected' : 'Not configured'}`);
+    console.log(`Server running at http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer().catch((error) => {
-  console.error("Failed to start server:", error);
-  process.exit(1);
-});
+startServer();
